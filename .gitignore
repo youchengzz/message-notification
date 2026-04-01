@@ -1,0 +1,57 @@
+# ==============================
+# 1. Maven 项目编译输出（必忽略）
+# ==============================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# ==============================
+# 2. IDEA 开发工具缓存（必忽略）
+# ==============================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+!**/src/main/**
+!**/src/test/**
+
+# ==============================
+# 3. 系统垃圾文件（必忽略）
+# ==============================
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*.tmp
+*.old
+
+# ==============================
+# 4. 日志文件（自动忽略）
+# ==============================
+logs/
+*.log
+*.log.*
+
+# ==============================
+# 5. 敏感配置文件（保护你的微信密钥、Token）
+# ==============================
+application-dev.yml
+application-prod.yml
+!application.yml
+
+# ==============================
+# 6. 其他缓存/临时文件
+# ==============================
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+/.idea/

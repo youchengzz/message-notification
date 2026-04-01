@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+# 项目自定义配置
+app:
+  # 接口基础配置
+  api:
+    login-url: https://cardvip.cc/260110/login
+    order-url: https://cardvip.cc/260110/order/index
+    username: job
+    password: www.741.com
+  # 订单监控配置（请修改为你实际的状态值！）
+  order:
+    wait-status: 1    # 等待处理 状态码
+    processing-status: 2 # 正在处理 状态码
+  # 微信服务号推送配置（必须填写你自己的信息）
+  # 客户新订单处理通知 48379
+  wechat:
+    app-id: wxf24ab9fd1426e75b
+    app-secret: cec35cfc9eb5d360176b2450f707d4b5
+    open-id: oAe7G298nNgIdgzMEzmXqKrovjXQ
+    template-id: 48379
+
+
+# 缓存配置（Token缓存24小时）
+spring:
+  cache:
+    caffeine:
+      spec: expireAfterWrite=24h
+    type: caffeine
