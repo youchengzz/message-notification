@@ -1,5 +1,8 @@
 package com.huixuan.ordertask.task;
 
+import cn.hutool.cache.CacheUtil;
+import cn.hutool.cache.impl.TimedCache;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
@@ -41,14 +44,15 @@ public class OrderMonitorTask {
     // 已推送去重
     private static final Set<String> pushedSet = new ConcurrentSkipListSet<>();
 
+    private static final TimedCache<String, String> ACCESS_TOKEN_CACHE = CacheUtil.newTimedCache(7000 * 1000);
     // ====================== 每3秒查询：等待处理1、处理中2 ======================
-    @Scheduled(fixedRate = 3000)
+    @Scheduled(fixedRate = 2000)
     public void queryNewOrder() {
         try {
             Map<String, Object> param = new HashMap<>();
             param.put("limit", 10);
             param.put("page", 1);
-            param.put("status", "2");
+            param.put("status", "1,2");
 
             String jsonBody = JSONUtil.toJsonStr(param);
             String timestamp = String.valueOf(System.currentTimeMillis());
@@ -78,6 +82,7 @@ public class OrderMonitorTask {
             log.info("查询到待处理订单数:{}", data.size());
             for (int i = 0; i < data.size(); i++) {
                 JSONObject order = data.getJSONObject(i);
+                log.info("订单详情：{}", order.toString());
                 String ordersn = order.getStr("ordersn");
                 Integer status = order.getInt("status");
 
@@ -110,7 +115,7 @@ public class OrderMonitorTask {
                 HttpResponse resp = HttpRequest.post(orderApiUrl)
                         .header("UserId", userId)
                         .header("Sign", sign)
-                        .header("Timestamp", String.valueOf(timestamp))
+                        .header("Timestamp", timestamp)
                         .header("Content-Type", "application/json")
                         .body(jsonBody)
                         .execute();
@@ -138,38 +143,73 @@ public class OrderMonitorTask {
     }
 
     // ====================== 发送微信模板消息 ======================
-    private void sendWechatTemplate(JSONObject order, String first) {
+    private void sendWechatTemplate(JSONObject order, String notifyType) {
         try {
-            // 1. 获取 access_token
-            String tokenUrl = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential"
-                    + "&appid=" + wechatConfig.getAppId()
-                    + "&secret=" + wechatConfig.getAppSecret();
+            // 1. 从缓存获取AccessToken（避免频繁调用被限制）
+            String accessToken = ACCESS_TOKEN_CACHE.get("WECHAT_ACCESS_TOKEN");
+            if (accessToken == null) {
+                String tokenUrl = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential"
+                        + "&appid=" + wechatConfig.getAppId()
+                        + "&secret=" + wechatConfig.getAppSecret();
+                String tokenResp = HttpRequest.get(tokenUrl).timeout(10000).execute().body();
+                JSONObject tokenRes = JSONUtil.parseObj(tokenResp);
 
-            JSONObject tokenRes = JSONUtil.parseObj(HttpRequest.get(tokenUrl).execute().body());
-            String accessToken = tokenRes.getStr("access_token");
+                // 打印获取Token失败原因，方便排查
+                if (tokenRes.containsKey("errcode") && tokenRes.getInt("errcode") != 0) {
+                    log.error("❌ 获取AccessToken失败：{}", tokenResp);
+                    return;
+                }
 
-            // 2. 组装模板消息
-            String url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + accessToken;
+                accessToken = tokenRes.getStr("access_token");
+                ACCESS_TOKEN_CACHE.put("WECHAT_ACCESS_TOKEN", accessToken);
+                log.info("✅ 刷新AccessToken成功");
+            }
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("touser", wechatConfig.getOpenId());
-            data.put("template_id", wechatConfig.getTemplateId());
+            // 2. 微信模板消息推送接口
+            String pushUrl = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + accessToken;
 
-            Map<String, Object> keywords = new HashMap<>();
-            keywords.put("first", MapUtil.of("value", first));
-            keywords.put("keyword1", MapUtil.of("value", order.getStr("ordersn")));
-            keywords.put("keyword2", MapUtil.of("value", order.getStr("goods_name")));
-            keywords.put("keyword3", MapUtil.of("value", getStatusText(order.getInt("status"))));
-            keywords.put("keyword4", MapUtil.of("value", order.getStr("recharge_account")));
-            keywords.put("remark", MapUtil.of("value", "系统自动监控通知"));
+            // 3. 组装模板消息（严格匹配模板字段！）
+            Map<String, Object> pushData = new HashMap<>();
+            pushData.put("touser", wechatConfig.getOpenId());
+            pushData.put("template_id", wechatConfig.getTemplateId());
+            // 👇 可选：添加跳转链接（对应模板里的「点击查看详情」）
+            pushData.put("url", "https://shop.cardvip.cc/pages/buyer/order");
 
-            data.put("data", keywords);
-            String body = JSONUtil.toJsonStr(data);
+            // 模板字段必须和{{xxx.DATA}}完全一致，大小写错一个就失败！
+            Map<String, Object> templateData = new HashMap<>();
+            // 产品名称 → {{thing7.DATA}}
+            templateData.put("thing7", MapUtil.of("value", order.getStr("goods_name")));
+            // 订单编号 → {{character_string10.DATA}}
+            templateData.put("character_string10", MapUtil.of("value", order.getStr("ordersn")));
+            // 订单金额 → {{amount9.DATA}}（加「元」后缀，符合展示习惯）
+            templateData.put("amount9", MapUtil.of("value", order.getStr("total_price") + "元"));
+            // 订单状态 → {{thing1.DATA}}
+            templateData.put("thing1", MapUtil.of("value", getStatusText(order.getInt("status"))));
+            // 下单时间 → {{time13.DATA}}（订单接口无下单时间，用当前系统时间，可按需修改）
+            templateData.put("time13", MapUtil.of("value", DateUtil.now()));
 
-            HttpRequest.post(url).body(body).execute();
-            log.info("微信模板消息推送成功 ordersn:{}", order.getStr("ordersn"));
+            pushData.put("data", templateData);
+            String body = JSONUtil.toJsonStr(pushData);
+
+            // 4. 发送请求并打印完整响应（排查问题核心）
+            String pushResp = HttpRequest.post(pushUrl)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .timeout(10000)
+                    .execute().body();
+
+            log.info("📩 微信推送完整响应：{}", pushResp);
+
+            // 5. 判断推送结果
+            JSONObject result = JSONUtil.parseObj(pushResp);
+            if (result.getInt("errcode", -1) == 0) {
+                log.info("✅ 微信模板消息推送成功！订单号：{}", order.getStr("ordersn"));
+            } else {
+                log.error("❌ 微信推送失败！错误信息：{}", pushResp);
+            }
+
         } catch (Exception e) {
-            log.error("推送微信失败", e);
+            log.error("❌ 推送微信异常", e);
         }
     }
 

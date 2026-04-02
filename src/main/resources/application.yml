@@ -21,7 +21,7 @@ app:
     app-id: wxf24ab9fd1426e75b
     app-secret: cec35cfc9eb5d360176b2450f707d4b5
     open-id: oAe7G298nNgIdgzMEzmXqKrovjXQ
-    template-id: 48379
+    template-id: S1LJomGVaQS8tkLmgpyV4LTNRVBBiSo4bzxkqgKmCXQ
 order:
   api-url: https://cardvip.cc/api/admin/v1/order/list
   user-id: job
@@ -29,8 +29,8 @@ order:
 wechat:
   app-id: wxf24ab9fd1426e75b
   app-secret: cec35cfc9eb5d360176b2450f707d4b5
-  open-id: oAe7G298nNgIdgzMEzmXqKrovjXQ
-  template-id: 48379
+  open-id: oRkTB2PFV0lT3CT--LIbDq2tz6O0
+  template-id: S1LJomGVaQS8tkLmgpyV4LTNRVBBiSo4bzxkqgKmCXQ
 
 
 # 缓存配置（Token缓存24小时）
