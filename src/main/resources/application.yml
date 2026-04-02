@@ -9,6 +9,8 @@ app:
     order-url: https://cardvip.cc/260110/order/index
     username: job
     password: www.741.com
+    api-key: FHqCjw8X94YzdVMTYuQlqmi5UJVGp7mXTNY7UsphWXTzKh
+    user-id: gp2OPiuec4Ifbw0x1hrJ6GM5dFqDnEys
   # 订单监控配置（请修改为你实际的状态值！）
   order:
     wait-status: 1    # 等待处理 状态码
@@ -20,6 +22,15 @@ app:
     app-secret: cec35cfc9eb5d360176b2450f707d4b5
     open-id: oAe7G298nNgIdgzMEzmXqKrovjXQ
     template-id: 48379
+order:
+  api-url: https://cardvip.cc/api/admin/v1/order/list
+  user-id: job
+  api-key: FHqCjw8X94YzdVMTYuQlqmi5UJVGp7mXTNY7UsphWXTzKh
+wechat:
+  app-id: wxf24ab9fd1426e75b
+  app-secret: cec35cfc9eb5d360176b2450f707d4b5
+  open-id: oAe7G298nNgIdgzMEzmXqKrovjXQ
+  template-id: 48379
 
 
 # 缓存配置（Token缓存24小时）
